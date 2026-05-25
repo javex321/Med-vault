@@ -1,0 +1,41 @@
+name: MedVault CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  verify:
+    name: Test, Typecheck, Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate Dockerfiles
+        run: |
+          docker build -f apps/api/Dockerfile -t medvault-api:ci .
+          docker build -f apps/worker/Dockerfile -t medvault-worker:ci .
+          docker build -f apps/web/Dockerfile -t medvault-web:ci .

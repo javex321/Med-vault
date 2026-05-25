@@ -1,0 +1,69 @@
+services:
+  - type: web
+    name: medvault-api
+    runtime: node
+    region: singapore
+    buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api"
+    startCommand: "npm run start --workspace @medvault/api"
+    healthCheckPath: /live
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ACCESS_TOKEN_SECRET
+        sync: false
+      - key: REFRESH_TOKEN_SECRET
+        sync: false
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: 900
+      - key: REFRESH_TOKEN_TTL_SECONDS
+        value: 2592000
+      - key: JWT_ISSUER
+        value: medvault-api
+      - key: JWT_AUDIENCE
+        value: medvault-web
+      - key: AUTH_COOKIE_SECURE
+        value: true
+      - key: AUTH_COOKIE_SAME_SITE
+        value: none
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: LOCAL_UPLOAD_DIR
+        value: /app/uploads
+      - key: MAX_DOCUMENT_UPLOAD_BYTES
+        value: 10485760
+      - key: EMAIL_QUEUE_NAME
+        value: medvault-email
+    disk:
+      name: medvault-uploads
+      mountPath: /app/uploads
+      sizeGB: 1
+
+  - type: worker
+    name: medvault-worker
+    runtime: node
+    region: singapore
+    buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker"
+    startCommand: "npm run start --workspace @medvault/worker"
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: EMAIL_QUEUE_NAME
+        value: medvault-email
+      - key: EMAIL_FROM
+        value: "MedVault <no-reply@medvault.local>"
