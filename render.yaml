@@ -6,7 +6,6 @@ services:
     buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api"
     startCommand: "npm run start --workspace @medvault/api"
     healthCheckPath: /live
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: NODE_ENV
         value: production
@@ -53,7 +52,6 @@ services:
     region: singapore
     buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker"
     startCommand: "npm run start --workspace @medvault/worker"
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: NODE_ENV
         value: production
