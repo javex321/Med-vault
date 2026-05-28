@@ -3,6 +3,7 @@ services:
     name: medvault-api
     runtime: node
     region: singapore
+    rootDir: .
     buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api"
     startCommand: "npm run start --workspace @medvault/api"
     healthCheckPath: /live
@@ -50,6 +51,7 @@ services:
     name: medvault-worker
     runtime: node
     region: singapore
+    rootDir: .
     buildCommand: "npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker"
     startCommand: "npm run start --workspace @medvault/worker"
     envVars:

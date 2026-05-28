@@ -192,15 +192,56 @@ npm run build --workspace @medvault/web
 npm run typecheck --workspace @medvault/api
 ```
 
+## Cloud Deployment: Vercel + Render
+
+The recommended cloud deployment is:
+
+- Vercel for `apps/web`
+- Render web service for `apps/api`
+- Render worker service for `apps/worker`
+- MongoDB Atlas for MongoDB
+- Upstash Redis for Redis/BullMQ
+
+This is an npm workspace monorepo. Keep Vercel and Render builds pointed at the repository root, not at `apps/web`, `apps/api`, or `apps/worker`.
+
+Vercel settings:
+
+```text
+Root Directory: repository root / blank
+Install Command: npm ci
+Build Command: npm run build --workspace @medvault/shared && npm run build --workspace @medvault/web
+Output Directory: apps/web/dist
+Environment: VITE_API_URL=https://your-render-api-url/api/v1
+```
+
+Render API settings:
+
+```text
+Root Directory: repository root / blank
+Build Command: npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api
+Start Command: npm run start --workspace @medvault/api
+Health Check Path: /live
+```
+
+Render worker settings:
+
+```text
+Root Directory: repository root / blank
+Build Command: npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker
+Start Command: npm run start --workspace @medvault/worker
+```
+
+See `docs/deployment.md` for the full step-by-step guide.
+
 ## Production Docker Deployment
 
-Create a production env file:
+Docker production config still exists for local/VPS-style deployment. Create a production env file:
 
 ```powershell
 copy .env.production.example .env.production
 ```
 
-Edit production secrets, then run:
+For Docker on one host, set `VITE_API_URL=/api/v1` and `CLIENT_ORIGIN=http://localhost:8080` or your same-domain HTTPS URL. Edit production secrets, then run:
 
 ```powershell
 npm run docker:prod:up

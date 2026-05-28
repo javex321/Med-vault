@@ -31,7 +31,7 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Build
+      - name: Build all workspaces from repository root
         run: npm run build
 
       - name: Validate Dockerfiles

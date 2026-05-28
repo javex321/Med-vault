@@ -11,7 +11,7 @@
     "dev:api": "npm run dev --workspace @medvault/api",
     "dev:web": "npm run dev --workspace @medvault/web",
     "dev:worker": "npm run dev --workspace @medvault/worker",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api && npm run build --workspace @medvault/web && npm run build --workspace @medvault/worker",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
     "verify": "npm run typecheck && npm run test && npm run build",

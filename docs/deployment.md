@@ -1,63 +1,89 @@
 # MedVault Deployment Guide
 
-This guide covers both deployment paths supported by the project:
+This guide is for the recommended cloud deployment:
 
-- Cloud deployment: Vercel frontend, Render API and worker, MongoDB Atlas, Upstash Redis.
-- Docker deployment: local or VPS-style production Compose with MongoDB, Redis, API, worker, and Nginx web.
+- Frontend: Vercel, serving `apps/web`
+- Backend API: Render web service, serving `apps/api`
+- Background worker: Render worker service, serving `apps/worker`
+- Database: MongoDB Atlas
+- Queue/cache: Upstash Redis
 
-Do not commit `.env` files or real credentials. Use dashboard environment variables for production secrets.
+MedVault is an npm workspace monorepo. Keep all cloud install and build commands running from the repository root, because the root contains `package.json` and `package-lock.json`.
 
-## Cloud Architecture
+Do not set Vercel or Render to build from `apps/web`, `apps/api`, or `apps/worker` directly.
+
+## 1. Confirm The Monorepo Shape
+
+Repository root:
 
 ```text
-Vercel static React app
-  -> calls Render API at https://your-api.onrender.com/api/v1
-Render API
-  -> MongoDB Atlas for persistent data
-  -> Upstash Redis for BullMQ queues
-  -> Render persistent disk at /app/uploads for local document storage
-Render worker
-  -> consumes email jobs from Redis
-  -> updates notification status in MongoDB
+D:\MedVault
 ```
 
-## Vercel Frontend
+Workspace folders:
 
-Use these settings in the Vercel project:
+```text
+apps/api
+apps/web
+apps/worker
+packages/shared
+```
 
-- Framework Preset: Vite
-- Root Directory: repository root
-- Install Command: `npm ci`
-- Build Command: `npm run build --workspace @medvault/shared && npm run build --workspace @medvault/web`
-- Output Directory: `apps/web/dist`
+Root files required by deployment:
 
-Environment variables:
+```text
+package.json
+package-lock.json
+vercel.json
+render.yaml
+```
+
+## 2. Vercel Frontend Settings
+
+Create or update the Vercel project for the frontend with these settings:
+
+| Setting | Value |
+| --- | --- |
+| Framework Preset | `Vite` |
+| Root Directory | repository root / blank |
+| Install Command | `npm ci` |
+| Build Command | `npm run build --workspace @medvault/shared && npm run build --workspace @medvault/web` |
+| Output Directory | `apps/web/dist` |
+
+Required Vercel environment variable:
 
 ```env
-VITE_API_URL=https://your-render-api.onrender.com/api/v1
+VITE_API_URL=https://your-render-api-url/api/v1
 ```
 
-The root `vercel.json` keeps these settings in code and rewrites all frontend routes to `index.html` so refresh/deep links work.
+Important:
 
-## Render API
+- Do not set Root Directory to `apps/web`.
+- There is no `apps/web/package-lock.json`.
+- `npm ci` must run beside the root `package-lock.json`.
+- The root `vercel.json` already stores the install command, build command, output directory, and frontend route rewrite.
 
-Use the root `render.yaml` Blueprint, or create services manually.
+## 3. Render API Settings
 
-API service settings:
+Use the root `render.yaml` Blueprint when possible.
 
-- Service Type: Web Service
-- Runtime: Node
-- Region: Singapore or the closest region to your users
-- Build Command: `npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api`
-- Start Command: `npm run start --workspace @medvault/api`
-- Health Check Path: `/live`
+Manual API settings:
 
-Required API environment variables:
+| Setting | Value |
+| --- | --- |
+| Service Type | Web Service |
+| Runtime | Node |
+| Root Directory | repository root / blank |
+| Build Command | `npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/api` |
+| Start Command | `npm run start --workspace @medvault/api` |
+| Health Check Path | `/live` |
+
+Required Render API environment variables:
 
 ```env
 NODE_ENV=production
 CLIENT_ORIGIN=https://your-vercel-app.vercel.app
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/medvault?retryWrites=true&w=majority&appName=<app-name>
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/medvault?retryWrites=true&w=majority&appName=MedVault
 REDIS_URL=rediss://default:<password>@<upstash-host>:6379
 ACCESS_TOKEN_SECRET=<64-plus-character-random-secret>
 REFRESH_TOKEN_SECRET=<64-plus-character-random-secret>
@@ -75,30 +101,35 @@ EMAIL_QUEUE_NAME=medvault-email
 
 Notes:
 
-- Render provides `PORT`; the API also supports `API_PORT` for local and Docker runs.
-- `AUTH_COOKIE_SAME_SITE=none` and `AUTH_COOKIE_SECURE=true` are required when the Vercel frontend and Render API are on different HTTPS domains.
-- Attach a persistent disk mounted at `/app/uploads` if using the current local document storage adapter.
+- Render provides `PORT` automatically. The API also supports `API_PORT`, but it is not required on Render.
+- Use `AUTH_COOKIE_SECURE=true` and `AUTH_COOKIE_SAME_SITE=none` because Vercel and Render are different HTTPS domains.
+- Attach a Render persistent disk at `/app/uploads` while the app uses local document storage.
 
-## Render Worker
+## 4. Render Worker Settings
 
-Worker service settings:
+Use the root `render.yaml` Blueprint when possible.
 
-- Service Type: Background Worker
-- Runtime: Node
-- Region: same as API
-- Build Command: `npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker`
-- Start Command: `npm run start --workspace @medvault/worker`
+Manual worker settings:
 
-Required worker environment variables:
+| Setting | Value |
+| --- | --- |
+| Service Type | Background Worker |
+| Runtime | Node |
+| Root Directory | repository root / blank |
+| Build Command | `npm ci && npm run build --workspace @medvault/shared && npm run build --workspace @medvault/worker` |
+| Start Command | `npm run start --workspace @medvault/worker` |
+
+Required Render worker environment variables:
 
 ```env
 NODE_ENV=production
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/medvault?retryWrites=true&w=majority&appName=<app-name>
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/medvault?retryWrites=true&w=majority&appName=MedVault
 REDIS_URL=rediss://default:<password>@<upstash-host>:6379
 EMAIL_QUEUE_NAME=medvault-email
+EMAIL_FROM="MedVault <no-reply@yourdomain.com>"
 ```
 
-Optional real-email variables:
+Optional real email variables:
 
 ```env
 SMTP_HOST=smtp.example.com
@@ -106,17 +137,17 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=<smtp-user>
 SMTP_PASS=<smtp-password>
-EMAIL_FROM=MedVault <no-reply@yourdomain.com>
 ```
 
-If SMTP is not configured, the worker uses Nodemailer's JSON transport, which is useful for demos but does not send real email.
+If SMTP is not configured, the worker uses a safe JSON transport for demos and does not send real email.
 
-## MongoDB Atlas
+## 5. MongoDB Atlas
 
-- Create or reuse an Atlas cluster.
-- Create a database user with read/write access to the `medvault` database.
-- Add Render outbound access in Network Access. For quick portfolio demos, `0.0.0.0/0` works but is less strict. For stronger security, use a provider/network setup with fixed outbound IPs.
-- Use the Drivers connection string and include `/medvault` before the query string.
+1. Create a MongoDB Atlas cluster.
+2. Create a database user with read/write access.
+3. Add network access for Render.
+4. Copy the driver connection string.
+5. Make sure the database name is included before the query string.
 
 Example shape:
 
@@ -124,11 +155,13 @@ Example shape:
 mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/medvault?retryWrites=true&w=majority&appName=MedVault
 ```
 
-## Upstash Redis
+Set this value as `MONGODB_URI` in both Render API and Render worker.
 
-- Create a Redis database in the closest region to the Render service.
-- Copy the TCP URL, not the REST URL.
-- Use the `rediss://` URL in both API and worker.
+## 6. Upstash Redis
+
+1. Create an Upstash Redis database.
+2. Copy the Redis TCP URL, not the REST URL.
+3. Use the `rediss://` URL.
 
 Example shape:
 
@@ -136,86 +169,111 @@ Example shape:
 rediss://default:<password>@your-db.upstash.io:6379
 ```
 
-## Document Uploads
+Set this value as `REDIS_URL` in both Render API and Render worker.
 
-The current production-ready adapter is local disk storage. On Render, use:
+## 7. Deployment Order
 
-```env
-STORAGE_PROVIDER=local
-LOCAL_UPLOAD_DIR=/app/uploads
-```
+1. Create MongoDB Atlas database.
+2. Create Upstash Redis database.
+3. Deploy Render API.
+4. Deploy Render worker.
+5. Copy the Render API URL.
+6. Set Vercel `VITE_API_URL` to the Render API URL plus `/api/v1`.
+7. Deploy Vercel frontend.
+8. Set Render API `CLIENT_ORIGIN` to the final Vercel frontend URL.
+9. Redeploy Render API after setting `CLIENT_ORIGIN`.
 
-Attach a Render persistent disk at `/app/uploads`. Without persistent storage, uploaded files can be lost when the service restarts or redeploys.
+## 8. Smoke Tests After Deployment
 
-Cloudinary/S3 provider names are reserved in the shared contract, but those adapters are not implemented in the current codebase.
+Replace the URLs with your real deployed URLs.
 
-## Production Docker Deployment
-
-Create a production env file:
-
-```powershell
-copy .env.production.example .env.production
-```
-
-Update secrets before running:
-
-- `MONGO_ROOT_PASSWORD`
-- `ACCESS_TOKEN_SECRET`
-- `REFRESH_TOKEN_SECRET`
-- SMTP values if you want real email delivery
-
-For local Docker testing without HTTPS, keep:
-
-```env
-AUTH_COOKIE_SECURE=false
-AUTH_COOKIE_SAME_SITE=lax
-CLIENT_ORIGIN=http://localhost:8080
-VITE_API_URL=/api/v1
-```
-
-For a real same-domain HTTPS Docker deployment, set:
-
-```env
-AUTH_COOKIE_SECURE=true
-AUTH_COOKIE_SAME_SITE=lax
-CLIENT_ORIGIN=https://your-domain.example
-VITE_API_URL=/api/v1
-```
-
-Start production Compose:
+API liveness:
 
 ```powershell
-npm run docker:prod:up
+curl.exe https://your-render-api-url/live
 ```
 
-Open:
+API readiness:
+
+```powershell
+curl.exe https://your-render-api-url/ready
+```
+
+Versioned API health:
+
+```powershell
+curl.exe https://your-render-api-url/api/v1/health
+```
+
+Frontend:
 
 ```text
-http://localhost:8080
-http://localhost:4000/health
-http://localhost:4000/live
-http://localhost:4000/ready
-http://localhost:4000/metrics
+https://your-vercel-app.vercel.app
 ```
 
-Logs:
+Browser test:
 
-```powershell
-npm run docker:prod:logs
+1. Open the Vercel URL.
+2. Register a test account.
+3. Create a patient profile.
+4. Add one timeline event.
+5. Add one medication.
+
+## 9. Common Deployment Errors
+
+### Vercel `npm ci` fails
+
+Most likely cause:
+
+Vercel Root Directory is set to `apps/web`.
+
+Fix:
+
+Set Root Directory to repository root / blank.
+
+### Vercel builds but frontend cannot call API
+
+Most likely causes:
+
+- `VITE_API_URL` is missing.
+- `VITE_API_URL` does not end with `/api/v1`.
+- Render API is not live.
+- Render API `CLIENT_ORIGIN` does not match the Vercel URL.
+
+### Render API starts but login fails in browser
+
+Check:
+
+- `CLIENT_ORIGIN=https://your-vercel-app.vercel.app`
+- `AUTH_COOKIE_SECURE=true`
+- `AUTH_COOKIE_SAME_SITE=none`
+- Vercel `VITE_API_URL=https://your-render-api-url/api/v1`
+
+### Render API is not ready
+
+Check:
+
+- `MONGODB_URI`
+- `REDIS_URL`
+- MongoDB Atlas network access
+- Upstash Redis TCP URL
+
+### Uploaded documents disappear
+
+The current production storage adapter is local disk. On Render, attach a persistent disk at:
+
+```text
+/app/uploads
 ```
 
-Stop:
+## 10. Pre-Deployment Verification
 
-```powershell
-npm run docker:prod:down
-```
-
-## Pre-Deployment Verification
-
-Run before deploying:
+Run from the repository root:
 
 ```powershell
 npm run typecheck
 npm run build
-npm run test
+npm run verify
 ```
+
+These commands should pass before redeploying.
