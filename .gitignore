@@ -9,3 +9,4 @@ coverage
 *.log
 uploadscookies.txt
 cookies.txt
+*.tsbuildinfo
